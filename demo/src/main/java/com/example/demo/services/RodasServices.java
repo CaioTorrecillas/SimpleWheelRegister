@@ -1,6 +1,7 @@
 package com.example.demo.services;
 
 
+import com.example.demo.dto.MarcaDto;
 import com.example.demo.dto.RodasDto;
 import com.example.demo.exceptions.RodasNotFoundException;
 import com.example.demo.model.Marca;
@@ -8,8 +9,12 @@ import com.example.demo.model.Rodas;
 import com.example.demo.repository.RodasRepository;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.bind.annotation.ResponseBody;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -24,56 +29,7 @@ public class RodasServices  {
     @Autowired
     private MarcaServices marcaServices;
 
-    //--------------------------------------------------------------------------------------------------
-    /*public RodasServices(RodasRepository rodasRepository) {
-        this.rodasRepository = rodasRepository;
-    }
-    public RodasServices(MarcaServices marcaServices){
-        this.marcaServices = marcaServices;
-    }*/
-    //-------------------------------------------CRUD---------------------------------------------------
 
-
-
-    /*@Transactional
-    public Rodas save(Rodas rodas) {
-        return rodasRepository.save(rodas);
-    }
-
-    public List<Rodas> findAll() {
-        return rodasRepository.findAll();
-    }
-
-    @Transactional
-    public Optional<Rodas> findById(Long id){
-        return rodasRepository.findById(id);
-    }
-
-    @Transactional
-    public void removerRoda(Rodas rodas){
-
-
-        rodasRepository.delete(rodas);
-
-    }*/
-
-//ANTIGO
-    /*public ResponseEntity<List<RodasDto>> findAll(){
-        List<Rodas> modelList = rodasRepository.findAll();
-        ArrayList<RodasDto> dtoList = new ArrayList<RodasDto>();
-        if(modelList != null){
-            RodasDto rodasDto;
-            for (Rodas rodasModel : modelList){
-                rodasDto = new RodasDto();
-                BeanUtils.copyProperties(rodasModel, rodasDto);
-                dtoList.add(rodasDto);
-            }
-        }
-        return ResponseEntity.status(HttpStatus.OK).body(dtoList);
-    }*/
-
-
-    //find all do marca
     public List<Rodas> findAllByMarca(Long id_marca){
         marcaServices.findById(id_marca);
         return rodasRepository.findAllByMarca(id_marca);
@@ -82,93 +38,86 @@ public class RodasServices  {
 
 
     public List<RodasDto> findAll() throws RodasNotFoundException{
-        return rodasRepository.findAll().stream().map(rodas -> modelMapper.map(rodas, RodasDto.class))
+        return rodasRepository
+                .findAll()
+                .stream()
+                .map(rodas -> modelMapper.map(rodas, RodasDto.class))
                 .collect(Collectors.toList());
-
 
     }
 
     public Rodas save(Long id_marca, RodasDto rodasDto){
 
-        rodasDto.setId(null);
+            MarcaDto marcaDto = marcaServices.findById(id_marca);
 
-
-        Marca marca = marcaServices.findById(id_marca);
-        rodasDto.setMarca(marca);
-
-        Rodas rodasRequest = modelMapper.map(rodasDto, Rodas.class);
-
-        return rodasRepository.save(rodasRequest);
-
-
-
-
-        /* public Rodas update(Long id, RodasDto obj){
-        Optional<Rodas> rodasOptional = rodasRepository.findById(id);
-        var rodas = new Rodas();
-        rodas = modelMapper.map(obj, Rodas.class);
-        rodas.setMaterial(rodasOptional.get().getMaterial());
-        rodas.setRaio(rodasOptional.get().getRaio());
-        return rodasRepository.save(rodas);
-
-
-
-    }*/
+            Marca marca = new Marca();
+            if(!marcaDto.equals(null)){
+                marca.setNome(marcaDto.getNome());
+                marca.setId(id_marca);
+                rodasDto.setMarca(marca);
+                Rodas rodasRequest = modelMapper.map(rodasDto, Rodas.class);
+                return rodasRepository.save(rodasRequest);
+            }else{
+                System.out.println("Marca necessary. Returning Error");
+                throw new RodasNotFoundException();
+            }
 
 
     }
 
-    //FindById
-    public Rodas findById(Long id){
+
+    public RodasDto findById(Long id){
         Optional<Rodas> rodas = rodasRepository.findById(id);
-        return rodas.orElseThrow(() -> new RodasNotFoundException());
+            if(!rodas.isEmpty()){
+                Optional<RodasDto> rodasDto = Optional.of(new RodasDto(rodas.get()));
+                return rodasDto.get();
+            }else {
+                System.out.println("Roda nao encontrada, lancando erro");
+                throw new RodasNotFoundException();
+            }
 
     }
 
-
-
-    //FINDBYID DTO
-    /*public RodasDto findById(Long id)  throws RodasNotFoundException {
-        Optional<Rodas> rodas = rodasRepository.findById(id);
-        RodasDto rodasDto = modelMapper.map(rodas, RodasDto.class);
-        return rodasDto;
-    }*/
-
-
-    //Delete
     public void delete(Long id){
+        try{
+            RodasDto rodasDto = findById(id);
+            if(!rodasDto.equals(null)){
+                this.rodasRepository.deleteById(id);
+                System.out.println("Deletando Rodas");
+            }else{
+                System.out.println("Roda nao encontrada, retornando erro");
+            }
+        }catch(Exception e){
+            e.getMessage();
 
-        findById(id);
-        rodasRepository.deleteById(id);
+        }
 
-    }
-
-    //UPDATE
-    /*public Rodas update(Long id, RodasDto rodasDto) throws RodasNotFoundException{
-        Rodas rodas = findById(id);
-
-        rodas.setMaterial(rodasDto.getMaterial());
-        rodas.setRaio(rodasDto.getRaio());
-        return rodasRepository.save(rodas);
-
-
-    }*/
-
-    public Rodas update(Long id, Rodas rodas){
-        Rodas rodasNova = findById(id);
-
-        updateData(rodasNova, rodas);
-        rodas = modelMapper.map(rodas, Rodas.class);
-
-        return rodasRepository.save(rodasNova);
 
 
     }
 
-    private void updateData(Rodas rodasNova, Rodas obj){
-        rodasNova.setMaterial(obj.getMaterial());
-        rodasNova.setRaio(obj.getRaio());
+    public void update(Long id, RodasDto rodasDto){
+        RodasDto rDto = findById(id);
+        Rodas rodas = new Rodas();
+        rodas.setId(id);
+        try{
+            if(rDto != null){
+
+                rodas.setMarca(rodasDto.getMarca());
+                rodas.setMaterial(rodasDto.getMaterial());
+                rodas.setRaio(rodasDto.getRaio());
+
+                rodasRepository.save(rodas);
+                System.out.println("Rodas editadas com sucesso");
+
+            }
+        }catch(Exception e){
+            System.out.println("Retornando erro");
+            e.getMessage();
+        }
     }
+
+
 
 
 
